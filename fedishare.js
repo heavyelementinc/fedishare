@@ -137,7 +137,7 @@ class Fedishare {
     return this.discoverShareEndpoint(url);
   }
 
-  async prompt(service, button, message = "") {
+  async prompt(service, button) {
     // Create our modal box
     const modal = new Modal();
     
