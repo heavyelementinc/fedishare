@@ -134,8 +134,7 @@ class Fedishare {
     
     // Build a URL out of the user's response
     const url = new URL(host);
-    this.discoverShareEndpoint(url);
-    window.shareWidget.track(button);
+    return this.discoverShareEndpoint(url);
   }
 
   async prompt(service, button, message = "") {
@@ -197,13 +196,13 @@ class Fedishare {
 
     // Check if this is actually a fediverse service
     if(!this.application?.software?.name) {
-      return shareWidget.fedi(this.originalButton, `<small style="color: red">This doesn't appear to be an ActivityPub server.</small>`);
+      return this.find(this.originalButton, `<small style="color: red">This doesn't appear to be an ActivityPub server.</small>`);
     }
 
     // Check if the application is supported
     if(this.application?.software?.name in this.endpointDetails === false) {
       // If the application type isn't supported, let's tell the user about it.
-      return shareWidget.fedi(this.originalButton, `<small style="color: red">Unknown or unsupported service!</small>`);
+      return this.find(this.originalButton, `<small style="color: red">Unknown or unsupported service!</small>`);
     }
     
     // Now that we're here, we're pretty sure we have a usable hostname
