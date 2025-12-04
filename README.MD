@@ -35,5 +35,27 @@ button.addEventListener("click", () => {
 })
 ```
 
-> [!NOTE]
-> I've only tested that the share buttons work on mastodon.online and lemmy.world since I only have accounts on those servers.
+## Testing
+| Service       | Test Results  |
+| ------------- | :-----------: |
+| Calckey       | ❓    |
+| Diaspora      | ❓    |
+| Fedibird      | ❓    |
+| Firefish      | ❓    |
+| Foundkey      | ❓    |
+| Friendica     | ❓    |
+| Glitchcafe    | ❓    |
+| GNUSocial     | ❓    |
+| Hometown      | ❓    |
+| Hubzilla      | ❓    |
+| kbin          | ❓    |
+| Lemmy         | ✅    |
+| Mastodon      | ✅    |
+| Meisskey      | ❓    |
+| Microdotblog  | ❓    |
+| Misskey       | ❓    |
+| Peertube      | ❌    |
+
+| Key                  |                              |          |
+|----------------------|------------------------------|----------|
+| ✅ Tested & Working | ❓ Supported but untested | ❌ Not supported |
