@@ -34,3 +34,6 @@ button.addEventListener("click", () => {
   fedi.find(button, "An optional message to display under the input field");
 })
 ```
+
+> [!NOTE]
+> I've only tested that the share buttons work on mastodon.online and lemmy.world since I only have accounts on those servers.
