@@ -1,5 +1,5 @@
 # Fedishare
-What is Fedishare? It's a simple library for querying Fediverse servies and 
+What is Fedishare? It's a simple library for querying Fediverse services and 
 redirecting your website's visitors to supported share pages.
 
 I built this for my website [The Bryant Review](https://gardinerbryant.com) and 
