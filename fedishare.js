@@ -9,102 +9,128 @@ class Fedishare {
   WIDTH = 550;
   HEIGHT = 720;
 
+  CAPABILITIES__SUPPORTS_PLAINTEXT = 0b0001;
+  CAPABILITIES__SUPPORTS_MARKDOWN  = 0b0010;
+  CAPABILITIES__SUPPORTS_HTML      = 0b0100;
+
   endpointDetails = {
     "calckey": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "diaspora": {
       endpoint: "bookmarklet?title={title}&notes={description}&url={url}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "fedibird": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "firefish": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "foundkey": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "friendica": {
       endpoint: "compose?title={title}&body={description}%0A{url}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "glitchcafe": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "gnusocial": {
       endpoint: "notice/new?status_textarea={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "hometown": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "hubzilla": {
       endpoint: "rpost?title={title}&body={description}%0A{url}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "kbin": {
       endpoint: "new/link?url={url}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "lemmy": {
       endpoint: "create_post?url={url}&title={title}&body={description}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "mastodon": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: (nodeInfo) => {
+        let capabilities = this.CAPABILITIES__SUPPORTS_PLAINTEXT;
+        if(nodeInfo.software.version.indexOf("glitch") >= 0) {
+          capabilities += this.CAPABILITIES__SUPPORTS_MARKDOWN;
+        }
+        return capabilities;
+      }
     },
     "meisskey": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "microdotblog": {
       endpoint: "post?text=[{title}]({url})%0A%0A{description}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "misskey": {
       endpoint: "share?text={body}",
       charLimit: null,
       width: null,
       height: null,
+      capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
   };
 
@@ -143,7 +169,7 @@ class Fedishare {
     
     // Establish our friendly names and examples
     let serviceName = "Fediverse";
-    let example = "https://mastodon.social";
+    let example = "https://mastodon.online";
     let icon = null;
 
     if(button) {
@@ -156,7 +182,7 @@ class Fedishare {
     switch(service) {
       case "mastodon":
         serviceName = "Mastodon";
-        example = "https://mastodon.online";
+        example = "https://mastodon.social";
         break;
       case "lemmy":
         serviceName = "Lemmy";
@@ -174,7 +200,10 @@ class Fedishare {
     if(!this.message) this.message = `<small style="color: rgb(from currentColor r g b / .5)">For example: ${example}</small>`;
 
     // Finally, let's wait for a prompt
-    const result = await modal.prompt(`<div class="icon">${icon}</div><p>Domain name of your ${serviceName} server?</div>`, "string", this.message, value);
+    const result = await modal.prompt(`<div class="icon">${icon}</div><p>Domain name of your ${serviceName} server?</div>`, "string", {
+      after: this.message,
+      prefill: value
+    });
     
     return result;
   }
@@ -182,15 +211,21 @@ class Fedishare {
   /** @param {URL} host */
   async discoverShareEndpoint(host) {
     try {
-      // Fetch the details from the user
+      // Fetch the nodeInfo from the user-supplied service
       this.nodeInfo = await fetch(`${host.protocol}//${host.host}/.well-known/nodeinfo`);
       this.nodeInfo = await this.nodeInfo.json();
       // Fetch the node software details
-      this.application = await fetch(this.nodeInfo.links[0].href);
-      this.application = await this.application.json();
     } catch (error) {
       // If there was an error, let's tell the user about it.
       this.prompt(this.service, this.originalButton, `<span style="color: red">Something went wrong. Please try again.</span>`);
+      return;
+    }
+
+    try {
+      this.application = await fetch(this.nodeInfo.links[0].href);
+      this.application = await this.application.json();
+    } catch (error) {
+      this.prompt(this.service, this.originalButton, `<span style="color: red">An unknown error occurred querying for nodeInfo</span>`);
       return;
     }
 
@@ -258,6 +293,7 @@ class Fedishare {
       options.join(',')
     );
   }
+
 }
 
 
@@ -281,9 +317,27 @@ class Modal {
    * @param {string} type 
    * @returns 
    */
-  prompt(title, type = "string", after = "", prefill = "") {
+  prompt(title, type = "string", options = {}) {
+    // Define our options
+    options = {
+      after: "",
+      prefill: "",
+      deleteModalAfterResolve: true,
+      /**
+       * @param {*} value 
+       * @param {Modal} modal `this`
+       * @returns {bool} `true` if valid, `false` if invalid
+       */
+      inputFilter: (value, modal) => {
+        // By default, we want to ensure *some* value was submitted
+        if(!value) return false;
+        return true;
+      },
+      ...options,
+    }
     // If the calling code hasn't specified buttons, let's do it here
     if(!this.cancel && !this.okay) this.buttons("Okay"); 
+    this.deleteModalAfterResolve = options.deleteModalAfterResolve;
     return new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.body = document.createElement("div");
@@ -307,16 +361,24 @@ class Modal {
       if(this.input) {
         this.input.name = "input";
         this.input.classList.add("gh-prompt-input");
-        this.input.value = prefill;
+        this.input.value = options.prefill;
       }
       
       // We've been passed "after" text, let's handle that
       this.after = document.createElement("div");
-      this.after.innerHTML = after;
+      this.after.innerHTML = options.after;
 
       // Handle "okay" clicks
       this.okay.addEventListener("click", () => {
-        if(!this.input.value) return;
+        if(this.type == "bool") {
+          // If we're a `bool` type, we should return `true` since we 
+          // clicked the `okay` button
+          resolve(true);
+          this.dialog.close();
+          return;
+        }
+        // Filter our inputs
+        if(options.inputFilter(this.input.value, this) === false) return;
         resolve(this.input.value);
         this.dialog.close();
       });
@@ -354,9 +416,15 @@ class Modal {
   }
 
   onCancel(resolve = (v) => {}) {
-    // Remove the modal dialog from the DOm
-    if(this.dialog.parentNode) this.dialog.parentNode.removeChild(this.dialog);
     // Resolve the promise
     this.resolve(false);
+    if(this.deleteModalAfterResolve) {
+      this.deleteModal();
+    }
+  }
+
+  deleteModal() {
+    // Remove the modal dialog from the DOM
+    if(this.dialog.parentNode) this.dialog.parentNode.removeChild(this.dialog);
   }
 }
