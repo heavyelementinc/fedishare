@@ -1,17 +1,21 @@
 class Fedishare {
 
-  title = "";
-  description = "";
-  href = "";
+  props = {
+    title: "",
+    description: "",
+    href: "",
+    hashtags: [],
+  }
   message = "";
   originalButton = "";
   localStorageKey = "";
   WIDTH = 550;
   HEIGHT = 720;
 
-  CAPABILITIES__SUPPORTS_PLAINTEXT = 0b0001;
-  CAPABILITIES__SUPPORTS_MARKDOWN  = 0b0010;
-  CAPABILITIES__SUPPORTS_HTML      = 0b0100;
+  CAPABILITIES__SUPPORTS_PLAINTEXT = 0b00001;
+  CAPABILITIES__SUPPORTS_MARKDOWN = 0b00010;
+  CAPABILITIES__SUPPORTS_HTML = 0b00100;
+  CAPABILITIES__SUPPORTS_HASHTAGS = 0b01000;
 
   endpointDetails = {
     "calckey": {
@@ -100,12 +104,15 @@ class Fedishare {
     },
     "mastodon": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: (nodeInfo) => {
+        return 500;
+      },
+      maxLinkLength: 23, // What's the max length of a URL on this platform?
       width: null,
       height: null,
       capabilities: (nodeInfo) => {
-        let capabilities = this.CAPABILITIES__SUPPORTS_PLAINTEXT;
-        if(nodeInfo.software.version.indexOf("glitch") >= 0) {
+        let capabilities = this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_HASHTAGS;
+        if (nodeInfo.software.version.indexOf("glitch") >= 0) {
           capabilities += this.CAPABILITIES__SUPPORTS_MARKDOWN;
         }
         return capabilities;
@@ -134,17 +141,40 @@ class Fedishare {
     },
   };
 
-  constructor(href, title, description) {
-    this.title = title;
-    this.description = description;
-    this.href = href;
+  /**
+   * 
+   * @param {string} href 
+   * @param {string} title 
+   * @param {string} description 
+   * @param {array} hashtags 
+   */
+  constructor(href, title, description, hashtags) {
+    this.props.href = href;
+    this.props.title = title;
+    this.props.description = description;
+    this.props.hashtags = hashtags;
+  }
+
+  get href() {
+    return this.props.href;
+  }
+  get title() {
+    return this.props.title;
+  }
+  get description() {
+    let des = this.props.description;
+    if(des.indexOf("\n")) des = des.substring(0, des.indexOf("\n"));
+    return des.trim();
+  }
+  get hashtags() {
+    return this.props.hashtags;
   }
 
   async find(button, message = "") {
     // Store the button that was originally pressed
-    this.originalButton = button; 
+    this.originalButton = button;
     this.message = message;
-    
+
     // Get our service name
     const service = button?.dataset.shareService ?? "generic";
 
@@ -153,11 +183,11 @@ class Fedishare {
 
     // Let's prompt the user for their Fediverse details
     let host = await this.prompt(service, button);
-    if(!host) return;
-    
+    if (!host) return;
+
     // Check if the user has provided us with just the hostname, prepend with "https" 
-    if(typeof host == "string" && host.indexOf("http") !== 0) host = `https://${host}`;
-    
+    if (typeof host == "string" && host.indexOf("http") !== 0) host = `https://${host}`;
+
     // Build a URL out of the user's response
     const url = new URL(host);
     return this.discoverShareEndpoint(url);
@@ -166,20 +196,20 @@ class Fedishare {
   async prompt(service, button) {
     // Create our modal box
     const modal = new Modal();
-    
+
     // Establish our friendly names and examples
     let serviceName = "Fediverse";
     let example = "https://mastodon.online";
     let icon = null;
 
-    if(button) {
+    if (button) {
       icon = button.querySelector("svg")?.parentNode.innerHTML;
       // modal.dialog.style.backgroundColor = button.backgroundColor;
       // modal.dialog.style.color = button.color;
     }
-    
+
     // Check for known services
-    switch(service) {
+    switch (service) {
       case "mastodon":
         serviceName = "Mastodon";
         example = "https://mastodon.social";
@@ -192,19 +222,19 @@ class Fedishare {
 
     // Restore our stored valued (if one exists)
     let value = "";
-    if("localStorage" in window && localStorage.getItem(this.localStorageKey)) {
+    if ("localStorage" in window && localStorage.getItem(this.localStorageKey)) {
       value = localStorage.getItem(this.localStorageKey);
     }
 
     // Display the message if we've been passed one
-    if(!this.message) this.message = `<small style="color: rgb(from currentColor r g b / .5)">For example: ${example}</small>`;
+    if (!this.message) this.message = `<small style="color: rgb(from currentColor r g b / .5)">For example: ${example}</small>`;
 
     // Finally, let's wait for a prompt
     const result = await modal.prompt(`<div class="icon">${icon}</div><p>Domain name of your ${serviceName} server?</div>`, "string", {
       after: this.message,
       prefill: value
     });
-    
+
     return result;
   }
 
@@ -230,19 +260,19 @@ class Fedishare {
     }
 
     // Check if this is actually a fediverse service
-    if(!this.application?.software?.name) {
+    if (!this.application?.software?.name) {
       return this.find(this.originalButton, `<small style="color: red">This doesn't appear to be an ActivityPub server.</small>`);
     }
 
     // Check if the application is supported
-    if(this.application?.software?.name in this.endpointDetails === false) {
+    if (this.application?.software?.name in this.endpointDetails === false) {
       // If the application type isn't supported, let's tell the user about it.
       return this.find(this.originalButton, `<small style="color: red">Unknown or unsupported service!</small>`);
     }
-    
+
     // Now that we're here, we're pretty sure we have a usable hostname
-    if("localStorage" in window && localStorage.setItem(this.localStorageKey, `${host.protocol}//${host.host}`));
-    
+    if ("localStorage" in window && localStorage.setItem(this.localStorageKey, `${host.protocol}//${host.host}`));
+
     // Let's actually open the window now
     this.open(host, this.application.software.name);
   }
@@ -253,21 +283,14 @@ class Fedishare {
    */
   open(url, software) {
     // Ensure `software` is actually a known and supported service
-    if(software in this.endpointDetails == false) {
+    if (software in this.endpointDetails == false) {
       return this.prompt(`<span color="red">"${software}" is not a supported Fediverse service.</span>`, "Ok", "Cancel", "bool");
     }
-    
+
     // Handle s
     let description = this.description;
-    let body = `${this.title}\n\n${description}\n\n${this.href}`;
-    const charLen = this.endpointDetails[software].charLimit;
-    if(charLen) {
-      
-      description = this.description.substr(0, charLen);
+    let body = this.getTruncatedBody(software);
 
-      const toSubtractFromDescription = this.title.length + this.href.length + 4;
-      body = `${this.title}\n\n${description.substr(0, charLen - toSubtractFromDescription)}\n\n${this.href}`;
-    }
 
     // Replace all instances of our placeholders with the appropriate details
     let endpoint = this.endpointDetails[software].endpoint
@@ -285,7 +308,7 @@ class Fedishare {
       `width=${this.endpointDetails[software].width ?? this.WIDTH}`,
       `height=${this.endpointDetails[software].height ?? this.HEIGHT}`
     ];
-    
+
     // Open the popover window
     window.open(
       `${url.protocol}//${url.host}/${endpoint}`,
@@ -294,9 +317,64 @@ class Fedishare {
     );
   }
 
+  getCharLimit(software) {
+    const limit = this.endpointDetails[software].charLimit;
+    if (!limit) return null;
+    if (typeof limit === "function") return limit();
+    return limit;
+  }
+
+  getMinLinkLength(software, linkLength) {
+    // return linkLength;
+    const length = this.endpointDetails[software].maxLinkLength;
+    if(!length) return linkLength;
+    return Math.min(linkLength, length);
+  }
+
+  getTruncatedBody(software) {
+    const max = this.getCharLimit(software);
+    const hashtags = this.hashtags.join(" ");
+    // If the platform doesn't have a character limit, pass everything.
+    if (!max) return `${this.title}\n\n${description}\n\n${hashtags}\n\n${this.href}`;
+
+    return getTruncatedBody({
+      max,
+      software,
+      href: this.href,
+      minLinkLength: this.getMinLinkLength(software, this.href.length),
+      title: this.title,
+      hashtags,
+      description: this.description,
+      minSpareCharsForDescription: 40
+    })
+  }
 }
 
+function getTruncatedBody(options = {}) {
+  let {max, href, minLinkLength, title, hashtags, description, minSpareCharsForDescription } = {
+    max: 0,
+    href: "",
+    minLinkLength: options.href.length, // Some services don't count the full length of a string against a URL
+    title: "",
+    hashtags: "",
+    description: "",
+    minSpareCharsForDescription: 40,
+    ...options
+  };
+  const link = href;
+  let body = `${title}\n\n${hashtags}\n\n`;
+  const min = body.length + minLinkLength;
+  // If the title, hashtags, and URL are longer than the max length, we should truncate the title
+  if(min > max) return `${title.substr(0,(max - min) - 5)}...\n\n${hashtags}\n\n${href}`;
 
+  const diff = options.max - min;
+  // If the difference between the max and min is greater 50 characters, then
+  // it's worth it for us to include a truncated description. So let's do that.
+  if(diff > minSpareCharsForDescription) return `${title}\n\n${description.substr(0, diff - 5)}...\n\n${hashtags}\n\n${href}`;
+  
+  // Otherwise, let's just append the link to the description
+  return body + link;
+}
 
 class Modal {
   dialog = null;
@@ -330,13 +408,13 @@ class Modal {
        */
       inputFilter: (value, modal) => {
         // By default, we want to ensure *some* value was submitted
-        if(!value) return false;
+        if (!value) return false;
         return true;
       },
       ...options,
     }
     // If the calling code hasn't specified buttons, let's do it here
-    if(!this.cancel && !this.okay) this.buttons("Okay"); 
+    if (!this.cancel && !this.okay) this.buttons("Okay");
     this.deleteModalAfterResolve = options.deleteModalAfterResolve;
     return new Promise((resolve, reject) => {
       this.resolve = resolve;
@@ -344,7 +422,7 @@ class Modal {
       this.body.innerHTML = title;
 
       // Build our input element
-      switch(type) {
+      switch (type) {
         case "bool":
           this.input = "";
           break;
@@ -357,20 +435,20 @@ class Modal {
           this.input.type = type;
           break;
       }
-      
-      if(this.input) {
+
+      if (this.input) {
         this.input.name = "input";
         this.input.classList.add("gh-prompt-input");
         this.input.value = options.prefill;
       }
-      
+
       // We've been passed "after" text, let's handle that
       this.after = document.createElement("div");
       this.after.innerHTML = options.after;
 
       // Handle "okay" clicks
       this.okay.addEventListener("click", () => {
-        if(this.type == "bool") {
+        if (this.type == "bool") {
           // If we're a `bool` type, we should return `true` since we 
           // clicked the `okay` button
           resolve(true);
@@ -378,17 +456,17 @@ class Modal {
           return;
         }
         // Filter our inputs
-        if(options.inputFilter(this.input.value, this) === false) return;
+        if (options.inputFilter(this.input.value, this) === false) return;
         resolve(this.input.value);
         this.dialog.close();
       });
 
       // Let's build our dialog box
       this.dialog.appendChild(this.body);
-      if(this.input) this.dialog.appendChild(this.input);
+      if (this.input) this.dialog.appendChild(this.input);
       this.dialog.appendChild(this.after);
       this.dialog.appendChild(this.buttonContainer);
-      
+
       // Using `showModal()` so we get a styleable ::backdrop pseudoelement
       this.dialog.showModal();
     });
@@ -401,7 +479,7 @@ class Modal {
     this.okay.innerHTML = okay;
 
     // Create our cancel button if we've been passed a label
-    if(cancel) {
+    if (cancel) {
       this.cancel = document.createElement("button");
       this.cancel.classList.add("gh-prompt-cancel");
       this.cancel.innerHTML = cancel;
@@ -415,16 +493,16 @@ class Modal {
     this.buttonContainer.appendChild(this.okay);
   }
 
-  onCancel(resolve = (v) => {}) {
+  onCancel(resolve = (v) => { }) {
     // Resolve the promise
     this.resolve(false);
-    if(this.deleteModalAfterResolve) {
+    if (this.deleteModalAfterResolve) {
       this.deleteModal();
     }
   }
 
   deleteModal() {
     // Remove the modal dialog from the DOM
-    if(this.dialog.parentNode) this.dialog.parentNode.removeChild(this.dialog);
+    if (this.dialog.parentNode) this.dialog.parentNode.removeChild(this.dialog);
   }
 }
