@@ -334,6 +334,7 @@ class Fedishare {
   getTruncatedBody(software) {
     const max = this.getCharLimit(software);
     const hashtags = this.hashtags.join(" ");
+    const description = this.description;
     // If the platform doesn't have a character limit, pass everything.
     if (!max) return `${this.title}\n\n${description}\n\n${hashtags}\n\n${this.href}`;
 
@@ -344,7 +345,7 @@ class Fedishare {
       minLinkLength: this.getMinLinkLength(software, this.href.length),
       title: this.title,
       hashtags,
-      description: this.description,
+      description,
       minSpareCharsForDescription: 40
     })
   }
