@@ -275,7 +275,7 @@ class Fedishare {
 
     // Let's actually open the window now
     this.open(host, this.application.software.name);
-    return host;
+    return this.application.software.name;
   }
 
   /**
