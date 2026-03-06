@@ -266,9 +266,9 @@ class Fedishare {
       after: this.message,
       prefill: value
     });
-    const input = document.createElement("label");
-    input.innerHTML = "<input type='checkbox' name='remember'> Next time skip this dialog.<br>";
-    this.modal.input.parentNode.appendChild(input)
+    // const input = document.createElement("label");
+    // input.innerHTML = "<input type='checkbox' name='remember'> Next time skip this dialog.<br>";
+    // this.modal.input.parentNode.appendChild(input)
 
     return this.modal.promise;
   }
