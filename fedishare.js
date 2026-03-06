@@ -423,7 +423,7 @@ class Fedishare {
 }
 
 function getTruncatedBody(options = {}) {
-  let {max, href, minLinkLength, title, hashtags, description, minSpareCharsForDescription } = {
+  let {max, href, minLinkLength, title, hashtags, description, supportsMarkdown, minSpareCharsForDescription } = {
     max: 0,
     href: "",
     minLinkLength: options.href.length, // Some services don't count the full length of a string against a URL
