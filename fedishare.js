@@ -5,99 +5,114 @@ class Fedishare {
     description: "",
     href: "",
     hashtags: [],
+    message: ""
   }
-  message = "";
+  
+  /** @property {Modal} modal */
+  modal = null;
   originalButton = "";
   localStorageKey = "";
+  localStorageRememberKey = "";
+
+  /** @property {function} resolve */
+  resolve = null;
+  /** @property {function} reject */
+  reject = null;
+  /** @property {Promise} promise */
+  promise = new Promise((resolve, reject) => {
+    this.resolve = resolve;
+    this.reject = reject;
+  });
+
   WIDTH = 550;
   HEIGHT = 720;
 
   CAPABILITIES__SUPPORTS_PLAINTEXT = 0b00001;
-  CAPABILITIES__SUPPORTS_MARKDOWN = 0b00010;
-  CAPABILITIES__SUPPORTS_HTML = 0b00100;
-  CAPABILITIES__SUPPORTS_HASHTAGS = 0b01000;
+  CAPABILITIES__SUPPORTS_MARKDOWN  = 0b00010;
+  CAPABILITIES__SUPPORTS_HTML      = 0b00100;
+  CAPABILITIES__SUPPORTS_HASHTAGS  = 0b01000;
 
   endpointDetails = {
     "calckey": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "diaspora": {
       endpoint: "bookmarklet?title={title}&notes={description}&url={url}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "fedibird": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "firefish": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "foundkey": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "friendica": {
       endpoint: "compose?title={title}&body={description}%0A{url}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "glitchcafe": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "gnusocial": {
       endpoint: "notice/new?status_textarea={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "hometown": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "hubzilla": {
       endpoint: "rpost?title={title}&body={description}%0A{url}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "kbin": {
       endpoint: "new/link?url={url}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "lemmy": {
       endpoint: "create_post?url={url}&title={title}&body={description}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
@@ -120,21 +135,21 @@ class Fedishare {
     },
     "meisskey": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "microdotblog": {
       endpoint: "post?text=[{title}]({url})%0A%0A{description}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
     },
     "misskey": {
       endpoint: "share?text={body}",
-      charLimit: null,
+      charLimit: -1,
       width: null,
       height: null,
       capabilities: this.CAPABILITIES__SUPPORTS_PLAINTEXT + this.CAPABILITIES__SUPPORTS_MARKDOWN
@@ -162,40 +177,57 @@ class Fedishare {
     return this.props.title;
   }
   get description() {
-    let des = this.props.description;
-    if(des.indexOf("\n")) des = des.substring(0, des.indexOf("\n"));
-    return des.trim();
+    let des = this.props.description.trim();
+    if(des.indexOf("\n") >= 0) des = des.substring(0, des.indexOf("\n"));
+    return des;
   }
   get hashtags() {
     return this.props.hashtags;
   }
 
-  async find(button, message = "") {
-    // Store the button that was originally pressed
-    this.originalButton = button;
-    this.message = message;
+  get button() {
+    return this.originalButton;
+  }
+  
+  set button(value) {
+    this.originalButton = value;
+  }
 
+  get message() {
+    return this.props.message;
+  }
+
+  set message(value) {
+    this.props.message = value;
+  }
+
+  find(button, message) {
+    this.button = button;
+    this.message = message;
     // Get our service name
-    const service = button?.dataset.shareService ?? "generic";
+    const service = this.button?.dataset.shareService ?? "generic";
 
     // Define the key we'll use to restore our answer in localStorage
     this.localStorageKey = `gh-share-${service}`;
+    this.localStorageRememberKey = `${this.localStorageKey}__remember`;
 
     // Let's prompt the user for their Fediverse details
-    let host = await this.prompt(service, button);
-    if (!host) return;
-
-    // Check if the user has provided us with just the hostname, prepend with "https" 
-    if (typeof host == "string" && host.indexOf("http") !== 0) host = `https://${host}`;
-
-    // Build a URL out of the user's response
-    const url = new URL(host);
-    return this.discoverShareEndpoint(url);
+    this.prompt(service, this.button);
+    return this.promise;
   }
 
   async prompt(service, button) {
+    // Check if the user has elected to *not display* the modal again.
+    // if("localStorage" in window && localStorage.getItem(this.localStorageRememberKey)) {
+    //   console.log("You chose to remember this instance...");
+    //   return localStorage.getItem(this.localStorageKey);
+    // }
     // Create our modal box
-    const modal = new Modal();
+    this.modal = new ModalPrompt();
+    this.modal.addEventListener("okay", event => {
+      event.preventDefault();
+      this.validateSubmission();
+    });
 
     // Establish our friendly names and examples
     let serviceName = "Fediverse";
@@ -230,15 +262,43 @@ class Fedishare {
     if (!this.message) this.message = `<small style="color: rgb(from currentColor r g b / .5)">For example: ${example}</small>`;
 
     // Finally, let's wait for a prompt
-    const result = await modal.prompt(`<div class="icon">${icon}</div><p>Domain name of your ${serviceName} server?</div>`, "string", {
+    this.modal.prompt(`<div class="icon">${icon}</div><p>Domain name of your ${serviceName} server?</div>`, "string", {
       after: this.message,
       prefill: value
     });
+    const input = document.createElement("label");
+    input.innerHTML = "<input type='checkbox' name='remember'> Next time skip this dialog.<br>";
+    this.modal.input.parentNode.appendChild(input)
 
-    return result;
+    return this.modal.promise;
   }
 
-  /** @param {URL} host */
+  async validateSubmission() {
+    this.modal.working(true);
+    let host = this.modal.input.value;
+    if (!host) return;
+
+    // Check if the user has provided us with just the hostname, prepend with "https" 
+    if (typeof host == "string" && host.indexOf("http") !== 0) host = `https://${host}`;
+
+    // Build a URL out of the user's response
+    const url = new URL(host);
+    const service = await this.discoverShareEndpoint(url);
+    // If we've made it here, we have successfully
+    this.modal.working(false);
+
+    const save = this.modal.dialog.querySelector("[name='remember']");
+    if(save && save.checked === true) {
+      localStorage.setItem(this.localStorageRememberKey, true);
+    }
+    this.modal.deleteModal();
+    return service;
+  }
+
+  /** 
+   * @param {URL} host 
+   * @returns {string|false} Returns a string version of the hostname or false is there was an error
+   * */
   async discoverShareEndpoint(host) {
     try {
       // Fetch the nodeInfo from the user-supplied service
@@ -247,27 +307,31 @@ class Fedishare {
       // Fetch the node software details
     } catch (error) {
       // If there was an error, let's tell the user about it.
-      this.prompt(this.service, this.originalButton, `<span style="color: red">Something went wrong. Please try again.</span>`);
-      return;
+      this.modal.message = `<span style="color: red">Something went wrong. Please try again.</span>`;
+      this.modal.working(false);
+      return false;
     }
 
     try {
       this.application = await fetch(this.nodeInfo.links[0].href);
       this.application = await this.application.json();
     } catch (error) {
-      this.prompt(this.service, this.originalButton, `<span style="color: red">An unknown error occurred querying for nodeInfo</span>`);
-      return;
+      this.modal.message = `<span style="color: red">An unknown error occurred querying for nodeInfo</span>`;
+      this.modal.working(false);
+      return false;
     }
 
     // Check if this is actually a fediverse service
     if (!this.application?.software?.name) {
-      return this.find(this.originalButton, `<small style="color: red">This doesn't appear to be an ActivityPub server.</small>`);
+      this.modal.message = `<small style="color: red">This doesn't appear to be an ActivityPub server.</small>`;
+      return false;
     }
 
     // Check if the application is supported
     if (this.application?.software?.name in this.endpointDetails === false) {
       // If the application type isn't supported, let's tell the user about it.
-      return this.find(this.originalButton, `<small style="color: red">Unknown or unsupported service!</small>`);
+      this.modal.message = `<small style="color: red">Unknown or unsupported service!</small>`;
+      return false;
     }
 
     // Now that we're here, we're pretty sure we have a usable hostname
@@ -321,8 +385,14 @@ class Fedishare {
   getCharLimit(software) {
     const limit = this.endpointDetails[software].charLimit;
     if (!limit) return null;
-    if (typeof limit === "function") return limit();
+    if (typeof limit === "function") return limit(software);
     return limit;
+  }
+
+  supportsMarkdown(software) {
+    let capabilities = this.endpointDetails[software].capabilities;
+    if(typeof capabilities == "function") capabilities = capabilities(this.application);
+    return (capabilities & this.CAPABILITIES__SUPPORTS_MARKDOWN === this.CAPABILITIES__SUPPORTS_MARKDOWN);
   }
 
   getMinLinkLength(software, linkLength) {
@@ -336,8 +406,7 @@ class Fedishare {
     const max = this.getCharLimit(software);
     const hashtags = this.hashtags.join(" ");
     const description = this.description;
-    // If the platform doesn't have a character limit, pass everything.
-    if (!max) return `${this.title}\n\n${description}\n\n${hashtags}\n\n${this.href}`;
+    const supportsMarkdown = this.supportsMarkdown(software);
 
     return getTruncatedBody({
       max,
@@ -347,6 +416,7 @@ class Fedishare {
       title: this.title,
       hashtags,
       description,
+      supportsMarkdown,
       minSpareCharsForDescription: 40
     })
   }
@@ -360,30 +430,72 @@ function getTruncatedBody(options = {}) {
     title: "",
     hashtags: "",
     description: "",
+    supportsMarkdown: 0,
     minSpareCharsForDescription: 40,
     ...options
   };
+  const newLine = "\n\n";
   const link = href;
-  let body = `${title}\n\n${hashtags}\n\n`;
+  
+  // Let's format our description
+  if(supportsMarkdown) description = `> ${description}`;
+
+  // If our max length is -1, we know we have an unlimited character length.
+  if(max <= -1) {
+    return `${title}${newLine}${description}${newLine}${hashtags}${newLine}${link}`;
+  }
+
+  let body = `${title}${newLine}${hashtags}${newLine}`;
+  // Let's see what the minimum value is
   const min = body.length + minLinkLength;
-  // If the title, hashtags, and URL are longer than the max length, we should truncate the title
+
+
+  // If the title, hashtags, and URL are longer than the max length, we should 
+  // truncate the title and omit the body.
   if(min > max) return `${title.substr(0,(max - min) - 5)}...\n\n${hashtags}\n\n${href}`;
 
   const diff = options.max - min;
+    let ellipsis = "...";
+  
+  const endsWithPunctuation = /[^\w]$/;
+  let truncated = description.substr(0, diff - 7).trim();
+  
+  // Detect non-word character at the end of the truncated string
+  if(endsWithPunctuation.test(truncated)) {
+    ellipsis = "";
+  }
   // If the difference between the max and min is greater 50 characters, then
   // it's worth it for us to include a truncated description. So let's do that.
-  if(diff > minSpareCharsForDescription) return `${title}\n\n${description.substr(0, diff - 5)}...\n\n${hashtags}\n\n${href}`;
+  if(diff > minSpareCharsForDescription) return `${title}\n\n${truncated}${ellipsis}\n\n${hashtags}\n\n${href}`;
   
   // Otherwise, let's just append the link to the description
   return body + link;
 }
 
-class Modal {
+/**
+ * @emits {okay} preventDefault() to prevent the okay event from closing the modal and resolving the promise
+ * @emits {cancel} preventDefault() to prevent the cancel event from closing the modal and resolving the promise to false
+ */
+class ModalPrompt extends EventTarget {
+  /** @property {HTMLDialogElement} */
   dialog = null;
+  /** @property {HTMLDivElement} */
+  body = null;
+  /** @property {HTMLDivElement} */
+  after = null;
+
+  /** @property {HTMLButtonElement} */
   okay = null;
+  /** @property {HTMLButtonElement|null} */
   cancel = null;
+
+  /** @property {Promise} promise the promise that will be resolved */
+  promise = null;
+  /** @property {function} resolve this.promise resolver */
   resolve = null;
+
   constructor() {
+    super();
     // Create our container
     this.dialog = document.createElement("dialog");
     this.dialog.classList.add("gh-share-dialog");
@@ -391,11 +503,71 @@ class Modal {
     this.dialog.addEventListener("cancel", this.onCancel.bind(this));
   }
 
+  /** @property {string} message the innerHTML of the `after` element */
+  get message() {
+    return this.after.innerHTML;
+  }
+
+  /** @param {string} string a string of valid HTML */
+  set message(string) {
+    this.after.innerHTML = string;
+  }
+
+  /** @property {HTMLDivElement} spinner a loading spinner */
+  spinner = null;
+
+  working(status) {
+    if(!this.spinner) {
+      this.spinner = document.createElement("div");
+      this.spinner.classList.add("modal--loading-spinner");
+      this.spinner.innerHTML = `
+        <style>
+          .modal--loading-spinner {
+            position: absolute;
+            inset: 0;
+            background-color: rgb(0 0 0 / .5);
+            display: grid;
+            place-content: center;
+          }
+          .modal--loading-spinner:before {
+            content: "";
+            width: 48px;
+            height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+          }
+          @keyframes rotation {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
+          } 
+        </style>
+      `;
+    }
+    switch(status) {
+      case true:
+      case "true":
+      case "working":
+        this.body.appendChild(this.spinner);
+        break;
+      default:
+        this.spinner.parentNode.removeChild(this.spinner);
+        break;
+    }
+  }
+
   /**
    * 
    * @param {string} title 
    * @param {string} type 
-   * @returns 
+   * @returns {Promise}
    */
   prompt(title, type = "string", options = {}) {
     // Define our options
@@ -418,7 +590,7 @@ class Modal {
     // If the calling code hasn't specified buttons, let's do it here
     if (!this.cancel && !this.okay) this.buttons("Okay");
     this.deleteModalAfterResolve = options.deleteModalAfterResolve;
-    return new Promise((resolve, reject) => {
+    this.promise = new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.body = document.createElement("div");
       this.body.innerHTML = title;
@@ -450,6 +622,8 @@ class Modal {
 
       // Handle "okay" clicks
       this.okay.addEventListener("click", () => {
+        const event = this.dispatchEvent(new CustomEvent("okay", {cancelable: true}));
+        if(!event) return;
         if (this.type == "bool") {
           // If we're a `bool` type, we should return `true` since we 
           // clicked the `okay` button
@@ -472,6 +646,7 @@ class Modal {
       // Using `showModal()` so we get a styleable ::backdrop pseudoelement
       this.dialog.showModal();
     });
+    return this.promise;
   }
 
   buttons(okay, cancel = "Cancel") {
@@ -496,6 +671,8 @@ class Modal {
   }
 
   onCancel(resolve = (v) => { }) {
+    const result = this.dispatchEvent(new CustomEvent("cancel", {cancelable: true}));
+    if(!result) return;
     // Resolve the promise
     this.resolve(false);
     if (this.deleteModalAfterResolve) {
