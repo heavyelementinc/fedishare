@@ -167,7 +167,7 @@ class Fedishare {
     this.props.href = href;
     this.props.title = title;
     this.props.description = description;
-    this.props.hashtags = hashtags;
+    this.hashtags = hashtags;
   }
 
   get href() {
@@ -182,7 +182,11 @@ class Fedishare {
     return des;
   }
   get hashtags() {
-    return this.props.hashtags;
+    return this.props.hashtags ?? [];
+  }
+  set hashtags(value) {
+    if(!value) value = [];
+    this.props.hashtags = value;
   }
 
   get button() {
@@ -404,7 +408,7 @@ class Fedishare {
 
   getTruncatedBody(software) {
     const max = this.getCharLimit(software);
-    const hashtags = this.hashtags.join(" ");
+    const hashtags = this.hashtags?.join(" ");
     const description = this.description;
     const supportsMarkdown = this.supportsMarkdown(software);
 
